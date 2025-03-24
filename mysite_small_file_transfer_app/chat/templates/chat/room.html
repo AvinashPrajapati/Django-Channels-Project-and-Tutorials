@@ -1,0 +1,117 @@
+<!-- chat/templates/chat/room.html -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Chat Room</title>
+</head>
+
+<body style="margin: auto; max-width: 820px; margin-top: 100px;">
+    <textarea id="chat-log" style="width:100%; resize: none;" rows="20"></textarea><br>
+
+    <fieldset>
+        <legend>Data Input:</legend>
+
+        <label for="chat-image-input">Image File:</label>
+        <input type="file" accept="image/jpeg, image/png, image/gif" id="chat-image-input"><br><br>
+
+        <label for="image">Message:</label>
+        <input id="chat-message-input" type="text" size="100"><br><br>
+
+        <input id="chat-message-submit" type="button" value="Send">
+    </fieldset>
+
+    {{ room_name|json_script:"room-name" }}
+    <script>
+        const roomName = JSON.parse(document.getElementById('room-name').textContent);
+
+        const chatSocket = new WebSocket(
+            'ws://'
+            + window.location.host
+            + '/ws/chat/'
+            + roomName
+            + '/'
+        );
+
+        chatSocket.onmessage = function (e) {
+            const data = JSON.parse(e.data);
+            console.log('\n-- ', data);
+
+            // document.querySelector('#chat-log').value += (data.message + '\n');
+        };
+
+        chatSocket.onclose = function (e) {
+            console.error('Chat socket closed unexpectedly');
+        };
+
+        // document.querySelector('#chat-message-input').focus();
+        document.querySelector('#chat-message-input').onkeyup = function (e) {
+            if (e.key === 'Enter') {  // enter, return
+                document.querySelector('#chat-message-submit').click();
+            }
+        };
+
+        // document.querySelector('#chat-message-submit').onclick = function (e) {
+        //     const messageInputDom = document.querySelector('#chat-message-input');
+        //     const imageInputDom = document.querySelector('#chat-image-input');
+
+        //     const message = messageInputDom.value;
+
+        //     const imageFile = imageInputDom.files[0];
+
+
+        //     chatSocket.send(JSON.stringify({
+        //         'message': message
+        //     }));
+        //     messageInputDom.value = '';
+        // };
+
+
+        document.querySelector('#chat-message-submit').onclick = function (e) {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const imageInputDom = document.querySelector('#chat-image-input');
+
+            const message = messageInputDom.value.trim();
+            const imageFile = imageInputDom.files[0];
+
+            // Initialize payload data
+            const data = {
+                'type': 'chat_message',
+                'message': message,
+                'username': 'Anonymous',
+                'valid_image': 'No'
+            };
+
+            console.log("Sending---", data);
+
+
+            // If an image is selected, send it as a Blob
+            if (imageFile) {
+                const reader = new FileReader();
+                
+                reader.onload = function (event) {
+                    const arrayBuffer = event.target.result;
+                    // Combine metadata + binary data into a Blob
+                    data.valid_image = 'Yes'
+
+                    const combinedBlob = new Blob([JSON.stringify(data), '||', arrayBuffer]);
+                    chatSocket.send(combinedBlob);  // ✅ Send as one combined message
+                };
+                reader.readAsArrayBuffer(imageFile);
+            } else {
+                if (message !== '') {
+                    chatSocket.send(JSON.stringify(data));
+                }
+            }
+
+            // Clear inputs after sending
+            messageInputDom.value = '';
+            imageInputDom.value = '';
+        };
+
+
+    </script>
+</body>
+
+</html>
